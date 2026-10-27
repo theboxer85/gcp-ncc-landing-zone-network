@@ -1,0 +1,897 @@
+# =============================================================================
+# NETWORKING CONFIGURATION
+# =============================================================================
+# Consumed by the central config module. Project references must match
+# resource-hierarchy-projects.yaml. Values marked TODO are unconfirmed.
+#
+# Addressing: one /16 per region, reachable from on-premises.
+#   us-west4  10.10.0.0/16
+#   us-west2  10.20.0.0/16
+# Both regions use the same layout, so re-basing a region changes only the
+# second octet.
+#
+# VPC blocks per region (us-west4 shown, us-west2 is the same in 10.29):
+#   hybrid           10.10.0.0/25
+#   shared-services  10.10.2.0/23
+#   security         10.10.4.0/22  (untrust, mgmt, trust /28s, DMZ /23)
+#   prod             10.10.64.0/20
+#   preprod          10.10.128.0/20
+#   per-workload     10.10.192.0/18  (PHI, research, added later)
+#
+# Non-routable: 100.64.0.0/10. Never advertised to on-premises and never shared
+# through the NCC hub, so only the VPC that holds a range can reach it. Used for
+# GKE pods and services, proxy-only and PSC NAT subnets, and the firewall HA
+# interfaces.
+#   us-west4  100.96.0.0/16    us-west2  100.97.0.0/16
+#   GKE pods 100.64.0.0/14, GKE services 100.72.0.0/18
+#
+# isolated: 172.17.0.0/19 us-west4, 172.16.0.0/19 us-west2. Not on the hub.
+# =============================================================================
+
+vpcs:
+  # prod: 10.10.64.0/20 and 10.20.64.0/20. Edge spoke.
+  prod:
+    project_ref: "prj-prod-host-net"
+    network_name: "vpc-prod"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "edge"
+
+    subnets:
+      prod-apps-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.64.0/21"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      prod-gke-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.72.0/24"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges:
+          pods: "100.64.0.0/16"
+          services: "100.72.0.0/20"
+
+      prod-psc-endpoints-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.73.0/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      prod-proxy-only-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.0.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      prod-psc-nat-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.4.0/26"
+        purpose: "PRIVATE_SERVICE_CONNECT"
+
+      prod-apps-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.64.0/21"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      prod-gke-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.72.0/24"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges:
+          pods: "100.65.0.0/16"
+          services: "100.72.16.0/20"
+
+      prod-psc-endpoints-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.73.0/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      prod-proxy-only-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.0.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      prod-psc-nat-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.4.0/26"
+        purpose: "PRIVATE_SERVICE_CONNECT"
+
+  # preprod: 10.10.128.0/20 and 10.20.128.0/20. Edge spoke. Reaches prod only
+  # through on-premises.
+  preprod:
+    project_ref: "prj-preprod-host-net"
+    network_name: "vpc-preprod"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "edge"
+
+    subnets:
+      preprod-apps-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.128.0/21"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      preprod-gke-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.136.0/24"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges:
+          pods: "100.66.0.0/16"
+          services: "100.72.32.0/20"
+
+      preprod-psc-endpoints-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.137.0/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      preprod-proxy-only-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.8.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      preprod-psc-nat-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.12.0/26"
+        purpose: "PRIVATE_SERVICE_CONNECT"
+
+      preprod-apps-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.128.0/21"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      preprod-gke-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.136.0/24"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges:
+          pods: "100.67.0.0/16"
+          services: "100.72.48.0/20"
+
+      preprod-psc-endpoints-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.137.0/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      preprod-proxy-only-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.8.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      preprod-psc-nat-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.12.0/26"
+        purpose: "PRIVATE_SERVICE_CONNECT"
+
+  # shared-services: 10.10.2.0/23 and 10.20.2.0/23. Center spoke.
+  # The only VPC on the hub with PSA.
+  shared-services:
+    project_ref: "prj-shared-svc-net"
+    network_name: "vpc-shared-services"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "center"
+    psa_ranges:
+      psa-usw4:
+        ip_cidr_range: "10.10.3.0/24"
+        purpose: "VPC_PEERING"
+        export_custom_routes: true
+      psa-usw2:
+        ip_cidr_range: "10.20.3.0/24"
+        purpose: "VPC_PEERING"
+        export_custom_routes: true
+
+    subnets:
+      shared-svc-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.2.0/25"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      shared-svc-psc-endpoints-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.2.128/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      shared-svc-proxy-only-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.16.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      shared-svc-psc-nat-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.20.0/26"
+        purpose: "PRIVATE_SERVICE_CONNECT"
+
+      shared-svc-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.2.0/25"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      shared-svc-psc-endpoints-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.2.128/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      shared-svc-proxy-only-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.16.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      shared-svc-psc-nat-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.20.0/26"
+        purpose: "PRIVATE_SERVICE_CONNECT"
+
+  # isolated: 172.17.0.0/19 and 172.16.0.0/19. Not a spoke.
+  # Keeps its default route and uses its own Cloud NAT for internet.
+  isolated:
+    project_ref: "prj-isolated-net"
+    network_name: "vpc-isolated"
+    routing_mode: "REGIONAL"
+    delete_default_routes_on_create: false
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "none"
+    psa_ranges:
+      psa-allocation:
+        ip_cidr_range: "172.17.8.0/22"
+        purpose: "VPC_PEERING"
+        export_custom_routes: false
+
+    subnets:
+      isolated-apps-usw4:
+        region: "us-west4"
+        ip_cidr_range: "172.17.0.0/23"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      isolated-proxy-only-usw4:
+        region: "us-west4"
+        ip_cidr_range: "172.17.4.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+      isolated-apps-usw2:
+        region: "us-west2"
+        ip_cidr_range: "172.16.0.0/23"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      isolated-proxy-only-usw2:
+        region: "us-west2"
+        ip_cidr_range: "172.16.4.0/22"
+        purpose: "REGIONAL_MANAGED_PROXY"
+        role: "ACTIVE"
+
+  # hybrid: 10.10.0.0/25 and 10.20.0.0/25. Routing VPC: holds the Cloud
+  # Routers, the VPN and the DNS hub. Center spoke.
+  hybrid:
+    project_ref: "prj-hybrid-net"
+    network_name: "vpc-hybrid"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "center"
+
+    subnets:
+      hybrid-routing-svc-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.0.0/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      hybrid-psc-endpoints-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.0.64/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      hybrid-routing-svc-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.0.0/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      hybrid-psc-endpoints-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.0.64/26"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+  # Security: 10.10.4.0/22 and 10.20.4.0/22. One VPC per firewall NIC.
+  # Created now because default routes can only be removed at create time.
+  # Mgmt is an edge spoke so Panorama on-premises can reach it. It uses the
+  # hub's default route, so it deletes its own.
+  sec-mgmt:
+    project_ref: "prj-security-net"
+    network_name: "vpc-sec-mgmt"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "edge"
+
+    subnets:
+      sec-mgmt-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.4.32/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      sec-mgmt-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.4.32/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+  # Keeps its default route: egress point for inspected traffic.
+  sec-untrust:
+    project_ref: "prj-security-net"
+    network_name: "vpc-sec-untrust"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: false
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "none"
+
+    subnets:
+      sec-untrust-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.4.0/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      sec-untrust-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.4.0/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+  # Trust and DMZ share one VPC. Center spoke. The DMZ default routes to the
+  # firewall load balancers are added in the firewall stage.
+  sec-trust:
+    project_ref: "prj-security-net"
+    network_name: "vpc-sec-trust"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "center"
+
+    subnets:
+      sec-trust-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.4.64/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      sec-trust-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.4.64/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      sec-dmz-usw4:
+        region: "us-west4"
+        ip_cidr_range: "10.10.6.0/23"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      sec-dmz-usw2:
+        region: "us-west2"
+        ip_cidr_range: "10.20.6.0/23"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+  # TODO: only needed for active/passive. Remove if autoscale.
+  sec-ha:
+    project_ref: "prj-security-net"
+    network_name: "vpc-sec-ha"
+    routing_mode: "GLOBAL"
+    delete_default_routes_on_create: true
+    network_firewall_policy_enforcement_order: "BEFORE_CLASSIC_FIREWALL"
+    ncc_attachment: "none"
+
+    subnets:
+      sec-ha-usw4:
+        region: "us-west4"
+        ip_cidr_range: "100.96.48.64/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+      sec-ha-usw2:
+        region: "us-west2"
+        ip_cidr_range: "100.97.48.64/28"
+        private_ip_google_access: true
+        flow_logs_enabled: true
+        secondary_ip_ranges: {}
+
+# Free in each regional /16: .0.128/25, .1.0/24, .8.0-.63.255, .80.0-.127.255,
+# .144.0-.191.255. .192.0/18 is reserved for per-workload VPCs (PHI, research),
+# which are not declared yet.
+
+# References only; this config module creates no resources.
+shared_vpc:
+  sec-trust:
+    vpc_ref: "sec-trust"
+    host_project_ref: "prj-security-net"
+    service_project_refs: []
+    service_project_network_users: {}
+  prod:
+    vpc_ref: "prod"
+    host_project_ref: "prj-prod-host-net"
+    service_project_refs: []
+    service_project_network_users: {}
+  preprod:
+    vpc_ref: "preprod"
+    host_project_ref: "prj-preprod-host-net"
+    service_project_refs: []
+    service_project_network_users: {}
+
+# Four routers, two running BGP. None in a workload VPC.
+# advertised_ip_ranges is enumerated because NCC installs no subnet routes in
+# the routing VPC: ALL_SUBNETS would advertise only hybrid's own subnets.
+# Each region uses its own tunnels; the other region's tunnels are the backup.
+# us-west4 is the default region for workloads and us-west2 holds the latency
+# sensitive ones, so traffic stays in the region the workload was placed in.
+# MEDs are equal. Google adds an inter-region cost (206 between these regions)
+# to routes learned in the other region, so the local tunnels win as long as
+# the MED gap stays below 206, in both directions.
+# Both routers advertise both regional /16s. Each also advertises its own /16
+# as two /17s, which on-premises prefers, so traffic enters in the region that
+# holds the address. If a region's edge fails, its /17s are withdrawn and the
+# /16 from the other region carries the traffic.
+# 199.36.153.4/30 lets on-premises reach Google APIs over the tunnels.
+# 35.199.192.0/19 is where Cloud DNS forwards from; replies must return here.
+# BFD shortens failure detection from about 40 s to about 5 s. Leave it
+# DISABLED until the on-premises edge devices are confirmed to support it.
+routers:
+  hybrid-usw4:
+    project_ref: "prj-hybrid-net"
+    vpc_ref: "hybrid"
+    name: "cr-hybrid-usw4"
+    region: "us-west4"
+    bgp:
+      asn: "64514"
+      advertise_mode: "CUSTOM"
+      advertised_route_priority: 100
+      bfd:
+        session_initialization_mode: "DISABLED"
+        min_transmit_interval: 1000
+        min_receive_interval: 1000
+        multiplier: 5
+      advertised_ip_ranges:
+        - "10.10.0.0/16"
+        - "10.20.0.0/16"
+        - "10.10.0.0/17"
+        - "10.10.128.0/17"
+        - "199.36.153.4/30"
+        - "35.199.192.0/19"
+
+  hybrid-usw2:
+    project_ref: "prj-hybrid-net"
+    vpc_ref: "hybrid"
+    name: "cr-hybrid-usw2"
+    region: "us-west2"
+    bgp:
+      asn: "64514"
+      advertise_mode: "CUSTOM"
+      advertised_route_priority: 100
+      bfd:
+        session_initialization_mode: "DISABLED"
+        min_transmit_interval: 1000
+        min_receive_interval: 1000
+        multiplier: 5
+      advertised_ip_ranges:
+        - "10.10.0.0/16"
+        - "10.20.0.0/16"
+        - "10.20.0.0/17"
+        - "10.20.128.0/17"
+        - "199.36.153.4/30"
+        - "35.199.192.0/19"
+
+  # No BGP on these two. A Cloud Router is the required parent for Cloud NAT
+  # even when no session runs on it.
+  sec-untrust-usw4:
+    project_ref: "prj-security-net"
+    vpc_ref: "sec-untrust"
+    name: "cr-sec-untrust-usw4"
+    region: "us-west4"
+    bgp: null
+
+  sec-untrust-usw2:
+    project_ref: "prj-security-net"
+    vpc_ref: "sec-untrust"
+    name: "cr-sec-untrust-usw2"
+    region: "us-west2"
+    bgp: null
+
+  isolated-usw4:
+    project_ref: "prj-isolated-net"
+    vpc_ref: "isolated"
+    name: "cr-isolated-usw4"
+    region: "us-west4"
+    bgp: null
+
+  isolated-usw2:
+    project_ref: "prj-isolated-net"
+    vpc_ref: "isolated"
+    name: "cr-isolated-usw2"
+    region: "us-west2"
+    bgp: null
+
+# Cloud NAT is regional and isolated has no on-premises path, so every region
+# holding an isolated subnet needs its own NAT or workloads there have no
+# egress at all.
+cloud_nats:
+  sec-untrust-usw4:
+    project_ref: "prj-security-net"
+    router_ref: "sec-untrust-usw4"
+    name: "nat-sec-untrust-usw4"
+    region: "us-west4"
+    source_subnetwork_ip_ranges_to_nat: "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  sec-untrust-usw2:
+    project_ref: "prj-security-net"
+    router_ref: "sec-untrust-usw2"
+    name: "nat-sec-untrust-usw2"
+    region: "us-west2"
+    source_subnetwork_ip_ranges_to_nat: "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  isolated-usw4:
+    project_ref: "prj-isolated-net"
+    router_ref: "isolated-usw4"
+    name: "nat-isolated-usw4"
+    region: "us-west4"
+    source_subnetwork_ip_ranges_to_nat: "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  isolated-usw2:
+    project_ref: "prj-isolated-net"
+    router_ref: "isolated-usw2"
+    name: "nat-isolated-usw2"
+    region: "us-west2"
+    source_subnetwork_ip_ranges_to_nat: "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+# One HA VPN gateway per region, each with two tunnels to one on-premises edge
+# (one public IP per edge, SINGLE_IP_INTERNALLY_REDUNDANT). onprem-edge-b must
+# be a physically separate device from onprem-edge-a.
+# Each tunnel's pre-shared key is read from Secret Manager in the hybrid
+# project, from the secret named in psk_secret. Create the secrets before
+# deploying; keys never go in this file.
+# bgp_ip is Google's end of the tunnel's /30; peer_bgp_ip is the edge's end.
+# Phase 2 adds vlan_attachments beside these; the tunnels stay as the backup.
+vpns:
+  hybrid-usw4:
+    project_ref: "prj-hybrid-net"
+    vpc_ref: "hybrid"
+    router_ref: "hybrid-usw4"
+    region: "us-west4"
+    name: "vpngw-hybrid-usw4"
+    peer:
+      name: "onprem-edge-a"
+      ip_address: "203.0.113.10"
+      remote_asn: "65001"
+    tunnels:
+      tun-usw4-0:
+        vpn_gateway_interface: 0
+        bgp_ip: "169.254.10.1"
+        peer_bgp_ip: "169.254.10.2"
+        psk_secret: "vpn-psk-tun-usw4-0"
+      tun-usw4-1:
+        vpn_gateway_interface: 1
+        bgp_ip: "169.254.11.1"
+        peer_bgp_ip: "169.254.11.2"
+        psk_secret: "vpn-psk-tun-usw4-1"
+
+  hybrid-usw2:
+    project_ref: "prj-hybrid-net"
+    vpc_ref: "hybrid"
+    router_ref: "hybrid-usw2"
+    region: "us-west2"
+    name: "vpngw-hybrid-usw2"
+    peer:
+      name: "onprem-edge-b"
+      ip_address: "203.0.113.20"
+      remote_asn: "65001"
+    tunnels:
+      tun-usw2-0:
+        vpn_gateway_interface: 0
+        bgp_ip: "169.254.20.1"
+        peer_bgp_ip: "169.254.20.2"
+        psk_secret: "vpn-psk-tun-usw2-0"
+      tun-usw2-1:
+        vpn_gateway_interface: 1
+        bgp_ip: "169.254.21.1"
+        peer_bgp_ip: "169.254.21.2"
+        psk_secret: "vpn-psk-tun-usw2-1"
+
+# Star topology gives two route tables. The edge table carries no edge-to-edge
+# routes, so edge spokes reach each other only through on-premises, where
+# the on-premises firewall decides what is allowed.
+# auto_accept_projects is a per-project allowlist. Without it a spoke is created
+# INACTIVE, and adding the project later does not activate it.
+# A VPC spoke and a producer VPC spoke are created in the project that owns the
+# VPC. A VPN spoke is regional and holds only tunnels from its own region.
+# exclude_export_ranges keeps the non-routable space off the hub.
+ncc:
+  hubs:
+    - name: "ncc-hub"
+      project_ref: "prj-hybrid-net"
+      preset_topology: "STAR"
+      export_psc: false
+
+  groups:
+    - name: "center"
+      hub_ref: "ncc-hub"
+      auto_accept_projects:
+        - "prj-shared-svc-net"
+        - "prj-hybrid-net"
+        - "prj-security-net"
+    - name: "edge"
+      hub_ref: "ncc-hub"
+      auto_accept_projects:
+        - "prj-prod-host-net"
+        - "prj-preprod-host-net"
+        - "prj-security-net"
+
+  spokes:
+    - name: "spoke-prod"
+      hub_ref: "ncc-hub"
+      group_ref: "edge"
+      type: "linked_vpc_network"
+      vpc_ref: "prod"
+      exclude_export_ranges: ["100.64.0.0/10"]
+
+    - name: "spoke-preprod"
+      hub_ref: "ncc-hub"
+      group_ref: "edge"
+      type: "linked_vpc_network"
+      vpc_ref: "preprod"
+      exclude_export_ranges: ["100.64.0.0/10"]
+
+    - name: "spoke-shared-services"
+      hub_ref: "ncc-hub"
+      group_ref: "center"
+      type: "linked_vpc_network"
+      vpc_ref: "shared-services"
+      exclude_export_ranges: ["100.64.0.0/10"]
+
+    # The routing VPC is also a VPC spoke, so traffic arriving on the tunnels
+    # reaches the other spokes.
+    - name: "spoke-hybrid-vpc"
+      hub_ref: "ncc-hub"
+      group_ref: "center"
+      type: "linked_vpc_network"
+      vpc_ref: "hybrid"
+      exclude_export_ranges: ["100.64.0.0/10"]
+
+    - name: "spoke-sec-mgmt"
+      hub_ref: "ncc-hub"
+      group_ref: "edge"
+      type: "linked_vpc_network"
+      vpc_ref: "sec-mgmt"
+      exclude_export_ranges: ["100.64.0.0/10"]
+
+    - name: "spoke-inspection"
+      hub_ref: "ncc-hub"
+      group_ref: "center"
+      type: "linked_vpc_network"
+      vpc_ref: "sec-trust"
+      exclude_export_ranges: ["100.64.0.0/10"]
+
+    # site_to_site_data_transfer is off. It is only required to carry traffic
+    # between two on-premises sites through Google. Off keeps the Partner
+    # Interconnect ASN restrictions out of scope.
+    - name: "spoke-hybrid-tunnels-usw4"
+      hub_ref: "ncc-hub"
+      group_ref: "center"
+      type: "linked_vpn_tunnels"
+      region: "us-west4"
+      site_to_site_data_transfer: false
+      vpn_refs: ["hybrid-usw4"]
+
+    - name: "spoke-hybrid-tunnels-usw2"
+      hub_ref: "ncc-hub"
+      group_ref: "center"
+      type: "linked_vpn_tunnels"
+      region: "us-west2"
+      site_to_site_data_transfer: false
+      vpn_refs: ["hybrid-usw2"]
+
+    # Private Service Access reaches only its own VPC. A producer VPC spoke puts
+    # the PSA ranges on the hub, in the same group as its VPC, so Cloud SQL and
+    # other PSA services are reachable wherever that VPC is.
+    - name: "spoke-shared-services-psa"
+      hub_ref: "ncc-hub"
+      group_ref: "center"
+      type: "linked_producer_vpc_network"
+      vpc_ref: "shared-services"
+      peering: "servicenetworking-googleapis-com"
+
+# The default route is removed, so Private Google Access needs an explicit
+# route per VPC. default-internet-gateway is a next-hop type, not public egress.
+# The hybrid routes also carry on-premises traffic to the restricted VIP.
+# 34.126.0.0/18 is a route and firewall item only; it has no DNS records.
+routes:
+  - name: "rt-pga-prod"
+    vpc_ref: "prod"
+    dest_range: "199.36.153.4/30"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+  - name: "rt-vpcsc-prod"
+    vpc_ref: "prod"
+    dest_range: "34.126.0.0/18"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+
+  - name: "rt-pga-preprod"
+    vpc_ref: "preprod"
+    dest_range: "199.36.153.4/30"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+  - name: "rt-vpcsc-preprod"
+    vpc_ref: "preprod"
+    dest_range: "34.126.0.0/18"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+
+  - name: "rt-pga-shared-services"
+    vpc_ref: "shared-services"
+    dest_range: "199.36.153.4/30"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+  - name: "rt-vpcsc-shared-services"
+    vpc_ref: "shared-services"
+    dest_range: "34.126.0.0/18"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+
+  - name: "rt-pga-sec-trust"
+    vpc_ref: "sec-trust"
+    dest_range: "199.36.153.4/30"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+
+  - name: "rt-vpcsc-sec-trust"
+    vpc_ref: "sec-trust"
+    dest_range: "34.126.0.0/18"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+
+  - name: "rt-pga-hybrid"
+    vpc_ref: "hybrid"
+    dest_range: "199.36.153.4/30"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+  - name: "rt-vpcsc-hybrid"
+    vpc_ref: "hybrid"
+    dest_range: "34.126.0.0/18"
+    next_hop_gateway: "default-internet-gateway"
+    priority: 1000
+
+# On-premises reaches Google APIs through the restricted VIP advertised above,
+# so no Private Service Connect endpoint for Google APIs is built.
+psc_endpoints: []
+
+# Each entry is a set of rules applied to the VPCs listed in associations.
+# A VPC accepts one global network firewall policy, and only from its own
+# project, so the network stage builds one policy per VPC in that VPC's
+# project, holding every rule set associated with it. The three baseline rules
+# are required for the routes above to carry traffic under an egress deny.
+# Traffic between prod and preprod is not blocked here: it has no path through
+# the hub and is carried through on-premises, where the on-premises firewall applies.
+firewall_policies:
+  global-baseline:
+    scope: "GLOBAL"
+    associations: ["prod", "preprod", "shared-services", "isolated", "hybrid",
+                   "sec-mgmt", "sec-untrust", "sec-trust", "sec-ha"]
+    rules:
+      allow-egress-restricted-vip:
+        direction: "EGRESS"
+        action: "allow"
+        priority: 1000
+        destination_ranges: ["199.36.153.4/30"]
+        protocol: "tcp"
+        ports: ["443"]
+
+      allow-egress-vpcsc-direct:
+        direction: "EGRESS"
+        action: "allow"
+        priority: 1001
+        destination_ranges: ["34.126.0.0/18"]
+        protocol: "tcp"
+        ports: ["443"]
+
+      # Cloud DNS forwards from this range, including to in-VPC targets.
+      allow-ingress-dns-forwarding:
+        direction: "INGRESS"
+        action: "allow"
+        priority: 1002
+        source_ranges: ["35.199.192.0/19"]
+        protocol: "tcp,udp"
+        ports: ["53"]
+
+# hybrid is the DNS hub. Inbound forwarding answers only queries that arrive on
+# tunnels in the same VPC, and forwarded queries leave through them, so the hub
+# is the VPC that holds the tunnels. GCP has no per-VPC resolver setting, so the
+# other VPCs peer to the hub for each zone, as listed in peered_by.
+#
+# On-premises DNS stays authoritative for corp.example.com and conditionally forwards
+# gcp.corp.example.com and the Google API domains to the hub's inbound forwarders.
+# gcp.corp.example.com is the cloud namespace: one zone, in the hub, where cloud
+# workloads create their own records.
+#
+# isolated peers only for googleapis.com. It has no on-premises path, so it
+# neither resolves nor publishes on-premises names.
+dns:
+  hybrid:
+    project_ref: "prj-hybrid-net"
+    vpc_ref: "hybrid"
+    inbound_policy: true
+    private_zones:
+      googleapis-com:
+        dns_name: "googleapis.com."
+        peered_by: ["prod", "preprod", "shared-services", "isolated", "sec-trust"]
+        records:
+          restricted-a: "199.36.153.4, 199.36.153.5, 199.36.153.6, 199.36.153.7"
+          wildcard-cname: "restricted.googleapis.com."
+      cloud:
+        dns_name: "gcp.corp.example.com."
+        peered_by: ["prod", "preprod", "shared-services", "sec-trust"]
+        records: {}
+    # TODO: uncomment with the on-premises DNS addresses (at least two).
+    forwarding_zones: {}
+    #   corp:
+    #     dns_name: "corp.example.com."
+    #     peered_by: ["prod", "preprod", "shared-services"]
+    #     targets: ["TODO-ONPREM-DNS-IP-1", "TODO-ONPREM-DNS-IP-2"]
+
+peerings: []
+vlan_attachments: []
+addresses: []
+nvas: []
